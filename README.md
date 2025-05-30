@@ -48,7 +48,7 @@
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/bolcaeto-luca/star-wars-explorer.git
+   git clone https://github.com/bolcaeto-luca/StarWars-explorer.git
 2. Start WEBSERVER open page in BrowserWeb
 
 #### Enjoy WebAPP | By Bocaletto Luca
