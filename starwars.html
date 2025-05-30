@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Esplora l'Universo Star Wars - Con Immagini</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    /* Stili generali */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+    }
+    body {
+      background-color: #f0f0f0;
+      color: #333;
+    }
+    header {
+      background: #000;
+      color: #fff;
+      padding: 10px 0;
+      text-align: center;
+    }
+    nav {
+      text-align: center;
+      padding: 10px;
+      background: #eee;
+    }
+    nav button {
+      background: #fff;
+      border: none;
+      padding: 10px 15px;
+      margin: 5px;
+      border-radius: 4px;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+      transition: background 0.3s;
+    }
+    nav button:hover {
+      background: #ddd;
+    }
+    #content {
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 20px;
+    }
+    /* Griglia: 4 elementi per riga */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 6px;
+      padding: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      cursor: pointer;
+      text-align: center;
+      transition: transform 0.2s;
+    }
+    .card:hover {
+      transform: scale(1.02);
+    }
+    .card img {
+      width: 100%;
+      height: 190px;
+      object-fit: cover;
+      border-radius: 4px;
+    }
+    .card h3 {
+      margin: 10px 0;
+    }
+    .pagination {
+      text-align: center;
+      margin-top: 20px;
+    }
+    .pagination button {
+      background: #fff;
+      border: none;
+      padding: 10px 15px;
+      margin: 0 5px;
+      border-radius: 4px;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+      transition: background 0.3s;
+    }
+    .pagination button:hover {
+      background: #ddd;
+    }
+    .notification {
+      background: #ffdddd;
+      border: 1px solid #ff5c5c;
+      padding: 15px;
+      border-radius: 6px;
+      max-width: 600px;
+      margin: 20px auto;
+      text-align: center;
+    }
+    .notification button {
+      background: #ff5c5c;
+      color: #fff;
+      border: none;
+      padding: 10px 15px;
+      margin-top: 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .notification button:hover {
+      background: #ff3b3b;
+    }
+    /* Stili per la modal (inizialmente nascosta) */
+    #modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.8);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: #fff;
+      padding: 20px;
+      border-radius: 5px;
+      max-width: 600px;
+      width: 90%;
+      position: relative;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal-content .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #ff5c5c;
+      color: #fff;
+      border: none;
+      padding: 5px 10px;
+      cursor: pointer;
+      border-radius: 3px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Esplora l'Universo Star Wars</h1>
+  </header>
+  <nav>
+    <button data-type="people">Personaggi</button>
+    <button data-type="planets">Pianeti</button>
+    <button data-type="films">Film</button>
+    <button data-type="species">Specie</button>
+    <button data-type="vehicles">Veicoli</button>
+    <button data-type="starships">Astronavi</button>
+  </nav>
+  <div id="content">
+    <p>Seleziona una categoria per iniziare l'esplorazione.</p>
+  </div>
+  
+  <!-- Modal per i dettagli (inizialmente nascosta) -->
+  <div id="modal">
+    <div class="modal-content" id="modalContent">
+      <button class="close-btn" id="closeModal">Chiudi</button>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    // Impostazioni globali e variabili per paginazione
+    const content = document.getElementById("content");
+    const modal = document.getElementById("modal");
+    const modalBody = document.getElementById("modalBody");
+    const closeModalBtn = document.getElementById("closeModal");
+    // 4 righe x 4 colonne = 16 elementi per pagina
+    const customPageSize = 16;
+    let currentType = "";
+    let currentPage = 1;
+    let currentItems = []; // Contiene tutti gli elementi della categoria corrente
+
+    // Configurazione API e proxy
+    const useProxy = true;
+    const API_BASE = "https://swapi.dev/api/";
+    const PROXY_BASE = "https://thingproxy.freeboard.io/fetch/";
+
+    // Gestione della modal: parte nascosta fino a quando non viene attivata dal clic su una card
+    modal.style.display = "none";
+    closeModalBtn.addEventListener("click", () => {
+      modal.style.display = "none";
+    });
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) {
+        modal.style.display = "none";
+      }
+    });
+
+    // Funzione per mostrare errori in pagina
+    function showError(message, retryCallback) {
+      content.innerHTML = `
+        <div class="notification">
+          <p>${message}</p>
+          ${retryCallback ? '<button id="retry">Riprova</button>' : ''}
+        </div>
+      `;
+      if (retryCallback) {
+        document.getElementById("retry").addEventListener("click", retryCallback);
+      }
+    }
+
+    // Estrae l'ID dall'URL, ad esempio "https://swapi.dev/api/people/1/" restituisce "1"
+    function extractId(url) {
+      const parts = url.split('/').filter(Boolean);
+      return parts[parts.length - 1];
+    }
+
+    // Restituisce l'URL dell'immagine in base alla categoria e all'ID
+    function getImageUrl(category, item) {
+      const baseImg = "https://starwars-visualguide.com/assets/img/";
+      const id = extractId(item.url);
+      switch (category) {
+        case "people": return `${baseImg}characters/${id}.jpg`;
+        case "planets": return `${baseImg}planets/${id}.jpg`;
+        case "starships": return `${baseImg}starships/${id}.jpg`;
+        case "vehicles": return `${baseImg}vehicles/${id}.jpg`;
+        case "species": return `${baseImg}species/${id}.jpg`;
+        case "films": return `${baseImg}placeholder.jpg`;
+        default: return "";
+      }
+    }
+
+    // Recupera tutti gli elementi per la categoria selezionata (paginazione lato client)
+    async function fetchAllItems(category) {
+      let items = [];
+      let url = API_BASE + category + "/";
+      url = useProxy ? PROXY_BASE + url : url;
+      while(url) {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) throw new Error("HTTP error " + response.status);
+          const data = await response.json();
+          items = items.concat(data.results);
+          let nextUrl = data.next;
+          url = nextUrl ? (useProxy ? PROXY_BASE + nextUrl : nextUrl) : null;
+        } catch (error) {
+          console.error("Errore nel fetch:", error);
+          showError("Si è verificato un errore durante il recupero dei dati.", () => loadCategory(category));
+          return [];
+        }
+      }
+      return items;
+    }
+
+    // Carica una categoria: fetch di tutti gli elementi e mostra la pagina iniziale
+    async function loadCategory(category) {
+      currentType = category;
+      currentPage = 1;
+      content.innerHTML = `<p>Caricamento...</p>`;
+      currentItems = await fetchAllItems(category);
+      if (currentItems.length > 0) {
+        renderListPage();
+      } else {
+        content.innerHTML = `<p>Nessun dato trovato.</p>`;
+      }
+    }
+
+    // Renderizza la pagina corrente (16 elementi per pagina) in una griglia da 4 per riga
+    function renderListPage() {
+      const totalPages = Math.ceil(currentItems.length / customPageSize);
+      const start = (currentPage - 1) * customPageSize;
+      const itemsToShow = currentItems.slice(start, start + customPageSize);
+      let html = `<div class="card-grid">`;
+      itemsToShow.forEach(item => {
+        const title = item.name ? item.name : item.title;
+        const imgUrl = getImageUrl(currentType, item);
+        html += `
+          <div class="card" data-url="${item.url}">
+            <img src="${imgUrl}" alt="${title}" onerror="this.onerror=null;this.src='https://starwars-visualguide.com/assets/img/placeholder.jpg';">
+            <h3>${title}</h3>
+            <p>Clicca per vedere i dettagli</p>
+          </div>
+        `;
+      });
+      html += `</div>`;
+      html += renderPagination(totalPages);
+      content.innerHTML = html;
+    }
+
+    // Renderizza la paginazione con pulsanti "Precedente" e "Successiva"
+    function renderPagination(totalPages) {
+      let paginationHtml = `<div class="pagination">`;
+      if (currentPage > 1) {
+        paginationHtml += `<button onclick="changeCustomPage(${currentPage - 1})">Precedente</button>`;
+      }
+      paginationHtml += `<span> Pagina ${currentPage} di ${totalPages} </span>`;
+      if (currentPage < totalPages) {
+        paginationHtml += `<button onclick="changeCustomPage(${currentPage + 1})">Successiva</button>`;
+      }
+      paginationHtml += `</div>`;
+      return paginationHtml;
+    }
+
+    // Cambia pagina e ripristina la visualizzazione
+    function changeCustomPage(page) {
+      currentPage = page;
+      renderListPage();
+    }
+
+    // Visualizza i dettagli di un elemento nella modal
+    async function displayDetails(url) {
+      modalBody.innerHTML = `<p>Caricamento dettagli...</p>`;
+      modal.style.display = "flex";
+      const finalUrl = useProxy ? PROXY_BASE + url : url;
+      try {
+        const response = await fetch(finalUrl);
+        if (!response.ok) throw new Error("HTTP error " + response.status);
+        const item = await response.json();
+        let detailsHtml = `<h2>${item.name ? item.name : item.title}</h2>`;
+        // Mostra l'immagine se disponibile
+        const imgUrl = getImageUrl(currentType, item);
+        detailsHtml += `<img src="${imgUrl}" alt="${item.name ? item.name : item.title}" style="width:100%;max-height:300px;object-fit:cover;margin-bottom:20px;" onerror="this.onerror=null;this.style.display='none';">`;
+        // Mostra tutte le proprietà dell'elemento
+        for (const key in item) {
+          if (Array.isArray(item[key]) && item[key].length > 0) {
+            detailsHtml += `<p><strong>${capitalize(key)}:</strong></p><ul>`;
+            item[key].forEach(val => {
+              detailsHtml += `<li>${val}</li>`;
+            });
+            detailsHtml += `</ul>`;
+          } else if (typeof item[key] === "string" && item[key].startsWith("http")) {
+            detailsHtml += `<p><strong>${capitalize(key)}:</strong> <a href="${item[key]}" target="_blank">${item[key]}</a></p>`;
+          } else {
+            detailsHtml += `<p><strong>${capitalize(key)}:</strong> ${item[key]}</p>`;
+          }
+        }
+        modalBody.innerHTML = detailsHtml;
+      } catch (error) {
+        console.error("Errore nel recupero dei dettagli:", error);
+        modalBody.innerHTML = `<p>Errore nel caricamento dei dettagli.</p>`;
+      }
+    }
+
+    // Capitalizza la prima lettera di una stringa
+    function capitalize(str) {
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    // Aggiunge i listener ai pulsanti delle categorie
+    document.querySelectorAll("nav button").forEach(button => {
+      button.addEventListener("click", () => {
+        const type = button.getAttribute("data-type");
+        loadCategory(type);
+      });
+    });
+
+    // Delegazione del click sulle card: al clic si aprirà la modal con i dettagli
+    document.getElementById("content").addEventListener("click", (event) => {
+      const card = event.target.closest(".card");
+      if (card && card.dataset.url) {
+        displayDetails(card.dataset.url);
+      }
+    });
+  </script>
+</body>
+</html>

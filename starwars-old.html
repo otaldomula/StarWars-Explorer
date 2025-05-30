@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Esplora l'Universo Star Wars</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    /* Stili di base */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+    }
+    body {
+      background-color: #f0f0f0;
+      color: #333;
+    }
+    header {
+      background: #000;
+      color: #fff;
+      padding: 10px;
+    }
+    header h1 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    nav {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    nav button {
+      background: #fff;
+      border: none;
+      padding: 10px 15px;
+      margin: 5px;
+      border-radius: 4px;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+      transition: background 0.3s;
+    }
+    nav button:hover {
+      background: #ddd;
+    }
+    #content {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      cursor: pointer;
+    }
+    .card h3 {
+      margin-bottom: 5px;
+    }
+    .pagination {
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .pagination button {
+      background: #fff;
+      border: none;
+      padding: 10px 15px;
+      margin: 5px;
+      border-radius: 4px;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+      transition: background 0.3s;
+    }
+    .pagination button:hover {
+      background: #ddd;
+    }
+    .details {
+      background: #fff;
+      padding: 20px;
+      border-radius: 6px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    .details p {
+      margin: 10px 0;
+    }
+    .back {
+      margin-top: 20px;
+      cursor: pointer;
+      color: blue;
+      text-decoration: underline;
+    }
+    .notification {
+      background: #ffdddd;
+      border: 1px solid #ff5c5c;
+      padding: 15px;
+      border-radius: 6px;
+      max-width: 600px;
+      margin: 20px auto;
+      text-align: center;
+    }
+    .notification button {
+      background: #ff5c5c;
+      color: #fff;
+      border: none;
+      padding: 10px 15px;
+      margin-top: 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .notification button:hover {
+      background: #ff3b3b;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Esplora l'Universo Star Wars</h1>
+  </header>
+  <nav>
+    <button data-type="people">Personaggi</button>
+    <button data-type="planets">Pianeti</button>
+    <button data-type="films">Film</button>
+    <button data-type="species">Specie</button>
+    <button data-type="vehicles">Veicoli</button>
+    <button data-type="starships">Astronavi</button>
+  </nav>
+  <div id="content">
+    <p>Seleziona una categoria per iniziare l'esplorazione.</p>
+  </div>
+  
+  <script>
+    const content = document.getElementById("content");
+    let currentType = "";
+    let currentPage = 1;
+    let totalPages = 1;
+    
+    // Imposta a true per utilizzare il proxy e risolvere i problemi CORS
+    const useProxy = true;
+    const API_BASE = "https://swapi.dev/api/";
+    const PROXY_BASE = "https://thingproxy.freeboard.io/fetch/";
+    
+    // Funzione per mostrare errori in pagina
+    function showError(message, retryCallback) {
+      content.innerHTML = `
+        <div class="notification">
+          <p>${message}</p>
+          ${retryCallback ? '<button id="retry">Riprova</button>' : ''}
+        </div>
+      `;
+      if (retryCallback) {
+        document.getElementById("retry").addEventListener("click", retryCallback);
+      }
+    }
+    
+    // Effettua la fetch dei dati, passando per il proxy se necessario
+    async function fetchData(type, page = 1) {
+      try {
+        const url = `${API_BASE}${type}/?page=${page}`;
+        const finalUrl = useProxy ? PROXY_BASE + url : url;
+        const response = await fetch(finalUrl);
+        if (!response.ok) {
+          throw new Error("HTTP error " + response.status);
+        }
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error("Errore nel fetch:", error);
+        showError(
+          "Si è verificato un errore durante il recupero dei dati.",
+          () => displayList(currentType, currentPage)
+        );
+        return null;
+      }
+    }
+    
+    // Visualizza la lista degli elementi per la categoria selezionata
+    async function displayList(type, page = 1) {
+      currentType = type;
+      currentPage = page;
+      content.innerHTML = `<p>Caricamento...</p>`;
+      const data = await fetchData(type, page);
+      if (data && data.results) {
+        totalPages = Math.ceil(data.count / 10);
+        let html = "";
+        data.results.forEach(item => {
+          const title = item.name ? item.name : item.title;
+          html += `
+            <div class="card" data-url="${item.url}">
+              <h3>${title}</h3>
+              <p>Clicca per vedere i dettagli</p>
+            </div>
+          `;
+        });
+        html += renderPagination();
+        content.innerHTML = html;
+      } else if (!data) {
+        // Errore già gestito in fetchData
+      } else {
+        content.innerHTML = `<p>Nessun dato trovato.</p>`;
+      }
+    }
+    
+    // Genera la paginazione per navigare tra le pagine dei risultati
+    function renderPagination() {
+      let paginationHtml = '<div class="pagination">';
+      if (currentPage > 1) {
+        paginationHtml += `<button onclick="changePage(${currentPage - 1})">Precedente</button>`;
+      }
+      if (currentPage < totalPages) {
+        paginationHtml += `<button onclick="changePage(${currentPage + 1})">Successiva</button>`;
+      }
+      paginationHtml += '</div>';
+      return paginationHtml;
+    }
+    
+    // Funzione per cambiare pagina
+    function changePage(newPage) {
+      displayList(currentType, newPage);
+    }
+    
+    // Visualizza i dettagli dell'elemento selezionato
+    async function displayDetails(url) {
+      content.innerHTML = `<p>Caricamento dettagli...</p>`;
+      try {
+        const finalUrl = useProxy ? PROXY_BASE + url : url;
+        const response = await fetch(finalUrl);
+        if (!response.ok) {
+          throw new Error("HTTP error " + response.status);
+        }
+        const item = await response.json();
+        let detailsHtml = `<div class="details">`;
+        for (const key in item) {
+          if (Array.isArray(item[key]) && item[key].length > 0) {
+            detailsHtml += `<p><strong>${capitalize(key)}:</strong></p><ul>`;
+            item[key].forEach(val => {
+              detailsHtml += `<li>${val}</li>`;
+            });
+            detailsHtml += `</ul>`;
+          } else if (typeof item[key] === "string" && item[key].startsWith("http")) {
+            detailsHtml += `<p><strong>${capitalize(key)}:</strong> <a href="${item[key]}" target="_blank">${item[key]}</a></p>`;
+          } else {
+            detailsHtml += `<p><strong>${capitalize(key)}:</strong> ${item[key]}</p>`;
+          }
+        }
+        detailsHtml += `<p class="back" onclick="displayList('${currentType}', ${currentPage})">&larr; Torna indietro</p>`;
+        detailsHtml += `</div>`;
+        content.innerHTML = detailsHtml;
+      } catch (error) {
+        console.error("Errore nel recupero dei dettagli:", error);
+        showError("Errore nel recupero dei dettagli.", () => displayList(currentType, currentPage));
+      }
+    }
+    
+    // Funzione helper per capitalizzare le stringhe
+    function capitalize(str) {
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+    
+    // Aggiunge i listener sui pulsanti di navigazione
+    document.querySelectorAll("nav button").forEach(button => {
+      button.addEventListener("click", () => {
+        const type = button.getAttribute("data-type");
+        displayList(type);
+      });
+    });
+    
+    // Delegazione del click sulle card per mostrare i dettagli
+    document.getElementById("content").addEventListener("click", (event) => {
+      const card = event.target.closest(".card");
+      if (card && card.dataset.url) {
+        displayDetails(card.dataset.url);
+      }
+    });
+  </script>
+</body>
+</html>
